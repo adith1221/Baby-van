@@ -1,0 +1,6 @@
+{
+  "name": "Baby Van",
+  "description": "Premium nursery and baby essentials boutique.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
