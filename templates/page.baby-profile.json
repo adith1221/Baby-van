@@ -1,0 +1,12 @@
+{
+  "name": "Customer Baby Profiles",
+  "sections": {
+    "main": {
+      "type": "customer-baby-profile",
+      "settings": {}
+    }
+  },
+  "order": [
+    "main"
+  ]
+}

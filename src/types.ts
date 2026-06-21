@@ -77,13 +77,23 @@ export interface Address {
   isDefault: boolean;
 }
 
+export interface Child {
+  id: string;
+  name: string;
+  birthdate: string;
+  gender: string;
+}
+
 export interface User {
   id: string;
   email: string;
   fullName: string;
   phone?: string;
   gender?: string;
-  childBirthdate?: string;
+  childBirthdate?: string; // Legacy or expected date
+  dob?: string;            // Customer own Date of Birth
+  profileImage?: string;   // Image URL for profile
+  children?: Child[];      // Multiple baby profiles
   shopifyAccessToken?: string;
 }
 
@@ -133,6 +143,8 @@ export interface ThemeConfig {
   promoBannerText: string;
   contactEmail: string;
   contactPhone: string;
+  shopifyThemeSyncEnabled?: boolean;
+  shopifyThemeSyncSource?: 'brand' | 'page';
 }
 
 export interface ShopifyCollection {

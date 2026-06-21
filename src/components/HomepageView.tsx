@@ -11,6 +11,7 @@ interface HomepageViewProps {
   faqs: { q: string; a: string }[];
   themeConfig: any;
   heroBanner: { title: string; subtitle: string; bgImage: string };
+  shopifyThemeData?: any;
   enabledSections: {
     promoHeader: boolean;
     hero: boolean;
@@ -38,6 +39,7 @@ export default function HomepageView({
   faqs,
   themeConfig,
   heroBanner,
+  shopifyThemeData,
   enabledSections,
   setView,
   setActiveProductId,
@@ -48,6 +50,43 @@ export default function HomepageView({
   wishlist
 }: HomepageViewProps) {
   const colors = getThemeClasses(themeConfig.primaryColor);
+
+  // Dynamic slider content based on Shopify live sync choice
+  const sliderHeadline = useMemo(() => {
+    if (themeConfig.shopifyThemeSyncEnabled && shopifyThemeData) {
+      if (themeConfig.shopifyThemeSyncSource === 'page') {
+        return shopifyThemeData.pageTitle || heroBanner.title;
+      } else {
+        return shopifyThemeData.shopName || heroBanner.title;
+      }
+    }
+    return heroBanner.title;
+  }, [themeConfig.shopifyThemeSyncEnabled, themeConfig.shopifyThemeSyncSource, shopifyThemeData, heroBanner.title]);
+
+  const sliderSubtitle = useMemo(() => {
+    if (themeConfig.shopifyThemeSyncEnabled && shopifyThemeData) {
+      if (themeConfig.shopifyThemeSyncSource === 'page') {
+        return shopifyThemeData.pageBody || heroBanner.subtitle;
+      } else {
+        return shopifyThemeData.shortDescription || shopifyThemeData.shopDescription || heroBanner.subtitle;
+      }
+    }
+    return heroBanner.subtitle;
+  }, [themeConfig.shopifyThemeSyncEnabled, themeConfig.shopifyThemeSyncSource, shopifyThemeData, heroBanner.subtitle]);
+
+  const sliderBgImage = useMemo(() => {
+    if (themeConfig.shopifyThemeSyncEnabled && shopifyThemeData && themeConfig.shopifyThemeSyncSource !== 'page' && shopifyThemeData.coverImageUrl) {
+      return shopifyThemeData.coverImageUrl;
+    }
+    return heroBanner.bgImage;
+  }, [themeConfig.shopifyThemeSyncEnabled, themeConfig.shopifyThemeSyncSource, shopifyThemeData, heroBanner.bgImage]);
+
+  const sliderSlogan = useMemo(() => {
+    if (themeConfig.shopifyThemeSyncEnabled && shopifyThemeData && themeConfig.shopifyThemeSyncSource !== 'page' && shopifyThemeData.slogan) {
+      return shopifyThemeData.slogan;
+    }
+    return null;
+  }, [themeConfig.shopifyThemeSyncEnabled, themeConfig.shopifyThemeSyncSource, shopifyThemeData]);
 
   // Simulated countdown timer (starts fresh each mount, e.g., 2 hours 14 mins 32 secs)
   const [timeLeft, setTimeLeft] = useState(8072); // in seconds
@@ -113,7 +152,7 @@ export default function HomepageView({
           {/* Background Illustration */}
           <div className="absolute inset-0 z-0 opacity-40">
             <img
-              src={heroBanner.bgImage}
+              src={sliderBgImage}
               alt="Baby Store Hero Banner"
               referrerPolicy="no-referrer"
               className="w-full h-full object-cover grayscale-xs"
@@ -123,16 +162,64 @@ export default function HomepageView({
 
           <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-20 space-y-4 md:space-y-6 max-w-lg md:max-w-2xl text-left">
             <div className={`p-1.5 px-3 rounded-full inline-block font-sans font-bold tracking-widest uppercase text-[10px] text-rose-700 bg-rose-50/90 border border-rose-100`}>
-              ✨ {themeConfig.bannerHeadline || "Limited Period Premium Carnival"}
+              ✨ {sliderSlogan || themeConfig.bannerHeadline || "Limited Period Premium Carnival"}
             </div>
             
             <h2 id="hero-headline" className="text-3xl sm:text-4xl md:text-6xl font-serif text-[#1A1A1A] tracking-tight leading-tight italic font-normal">
-              {heroBanner.title}
+              {sliderHeadline}
             </h2>
 
             <p id="hero-subtitle" className="text-xs sm:text-sm text-neutral-600 leading-relaxed font-sans max-w-md">
-              {heroBanner.subtitle}
+              {sliderSubtitle}
             </p>
+
+            {/* Shopify Live Discounts list */}
+            {flashDeals.length > 0 && (
+              <div className="bg-[#FAF6F0]/90 backdrop-blur-md border border-[#E9E2D8] p-3 md:p-4 rounded-2xl max-w-md space-y-2.5 shadow-xs animate-fade-in">
+                <div className="flex items-center gap-1.5 text-rose-700 font-sans font-bold text-[10px] uppercase tracking-wider">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                  </span>
+                  <span>🏪 Shopify Active Discounts (Compare At Rates)</span>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  {flashDeals.slice(0, 3).map(p => {
+                    const discount = p.originalPrice ? Math.round(((p.originalPrice - p.price) / p.originalPrice) * 100) : 0;
+                    return (
+                      <div
+                        key={p.id}
+                        onClick={() => {
+                          setActiveProductId(p.id);
+                          setView('product');
+                        }}
+                        className="flex items-center justify-between p-2 rounded-xl bg-white hover:bg-rose-50/20 border border-neutral-100 hover:border-rose-200 transition text-[11px] cursor-pointer group"
+                      >
+                        <div className="flex items-center gap-2">
+                          <img src={p.images[0]} referrerPolicy="no-referrer" alt={p.name} className="w-8 h-8 rounded-lg object-cover border border-neutral-150" />
+                          <div>
+                            <p className="font-bold text-neutral-800 line-clamp-1 group-hover:text-rose-700 transition max-w-[170px]">{p.name}</p>
+                            <p className="text-[10px] text-neutral-400 font-sans">Compare: <span className="line-through">₹{p.originalPrice}</span></p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="text-red-600 bg-red-50 px-1.5 py-0.5 rounded-md font-bold font-sans text-[9px] border border-red-100 animate-pulse">
+                            -{discount}% OFF
+                          </span>
+                          <span className="font-extrabold text-[#1A1A1A] font-mono text-xs">
+                            ₹{p.price}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <p className="text-[9px] text-neutral-500 font-sans flex items-center justify-between">
+                  <span>*Click any deal to buy on web store.</span>
+                  <span id="shopify-offers-direct-link" className="text-rose-600 font-bold hover:underline cursor-pointer" onClick={() => setView('offers')}>See All Deals &rarr;</span>
+                </p>
+              </div>
+            )}
 
             <div className="flex flex-wrap gap-3 pt-2">
               <button

@@ -1,0 +1,75 @@
+{% comment %}
+  Shopify Customer Profile Section for Baby Van Theme
+  Renders secure customer metadata and parenting roles.
+{% endcomment %}
+
+<div class="customer-profile-container container">
+  <div class="row">
+    <div class="col-12 col-md-4">
+      <div class="profile-card-sidebar text-center">
+        <div class="avatar-circle-display">
+          <span>👶</span>
+        </div>
+        <h4 class="profile-title">{{ customer.name | default: 'Parent Member' }}</h4>
+        <p class="profile-email text-muted">{{ customer.email }}</p>
+      </div>
+    </div>
+
+    <div class="col-12 col-md-8">
+      <div class="profile-detail-card card md-shadow p-5">
+        <h3 class="card-title text-uppercase font-bold mb-4">Edit Profile Coordinates</h3>
+        
+        {% form 'customer_address', customer.default_address %}
+          <div class="form-row">
+            <div class="form-group col-md-6">
+              <label for="ProfileFirstName">First Name</label>
+              <input type="text" id="ProfileFirstName" name="address[first_name]" value="{{ customer.first_name }}" class="form-control">
+            </div>
+            <div class="form-group col-md-6">
+              <label for="ProfileLastName">Last Name</label>
+              <input type="text" id="ProfileLastName" name="address[last_name]" value="{{ customer.last_name }}" class="form-control">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="ProfilePhone">Helpline Handphone</label>
+            <input type="tel" id="ProfilePhone" name="address[phone]" value="{{ customer.phone }}" class="form-control" placeholder="+91">
+          </div>
+
+          <!-- Customer Metafield inputs for Parenting Role and DOB -->
+          <div class="form-row">
+            <div class="form-group col-md-6">
+              <label for="ParentRole">Parenting Role</label>
+              <select id="ParentRole" name="customer[metafields][parenting][role]" class="form-control bg-white">
+                <option value="mother">🤰 Mother</option>
+                <option value="father">🧔 Father</option>
+                <option value="guardian">🤱 Guardian</option>
+              </select>
+            </div>
+            <div class="form-group col-md-6">
+              <label for="ParentDOB">Birthdate (Private)</label>
+              <input type="date" id="ParentDOB" name="customer[metafields][parenting][dob]" class="form-control">
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary mt-3 text-uppercase font-extrabold uppercase">Save Parenting Profile</button>
+        {% endform %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Customer Profile",
+  "class": "shopify-section-customer-profile",
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "My Profile Details"
+    }
+  ]
+}
+{% endschema %}

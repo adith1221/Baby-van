@@ -1,0 +1,12 @@
+{
+  "name": "Customer Wishlist Favorites",
+  "sections": {
+    "main": {
+      "type": "customer-wishlist",
+      "settings": {}
+    }
+  },
+  "order": [
+    "main"
+  ]
+}

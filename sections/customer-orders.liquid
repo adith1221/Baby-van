@@ -1,0 +1,85 @@
+{% comment %}
+  Shopify Customer Orders Section for Baby Van Theme
+  Renders past order logs and integrates tracking identifiers securely.
+{% endcomment %}
+
+<div class="customer-orders-container container py-5">
+  <div class="section-header border-bottom pb-3 mb-4">
+    <h2 class="h4 font-bold text-uppercase tracking-wider">📦 My Parenting Orders History</h2>
+    <p class="text-muted text-xs">Exclusively serving past invoices belonging to {{ customer.name }}.</p>
+  </div>
+
+  {% paginate customer.orders by 10 %}
+    {% if customer.orders.size == 0 %}
+      <div class="text-center py-5 border rounded bg-light">
+        <p class="mb-3">You have not ordered any premium baby clothes or crib materials yet!</p>
+        <a href="/collections/all" class="btn btn-dark uppercase font-bold text-xs py-2 px-4">Explore Store Collections</a>
+      </div>
+    {% else %}
+      <div class="table-responsive">
+        <table class="table table-hover border">
+          <thead class="thead-dark">
+            <tr>
+              <th>Order Ref</th>
+              <th>Status</th>
+              <th>Date Placed</th>
+              <th>Items</th>
+              <th>Grand Total</th>
+              <th>Package Tracking</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for order in customer.orders %}
+              <tr>
+                <td><strong class="font-mono text-indigo-600">{{ order.name }}</strong></td>
+                <td>
+                  <span class="badge {% if order.fulfillment_status == 'fulfilled' %}bg-success{% else %}bg-warning text-dark{% endif %} text-uppercase">
+                    {{ order.fulfillment_status_label }}
+                  </span>
+                </td>
+                <td>{{ order.created_at | date: "%Y-%m-%d" }}</td>
+                <td>
+                  <div class="order-items-list-summary text-wrap">
+                    {% for line_item in order.line_items %}
+                      <span class="d-block block truncate">{{ line_item.title }} (x{{ line_item.quantity }})</span>
+                    {% endfor %}
+                  </div>
+                </td>
+                <td><span class="font-mono text-dark font-black font-bold">{{ order.total_price | money }}</span></td>
+                <td>
+                  {% if order.fulfillment_status == 'fulfilled' %}
+                    {% for line_item in order.line_items %}
+                      {% if line_item.fulfillment.tracking_number %}
+                        <a href="{{ line_item.fulfillment.tracking_url }}" target="_blank" class="btn btn-sm btn-outline-dark text-xs uppercase font-bold py-1 px-2">
+                          Track Code: {{ line_item.fulfillment.tracking_number }}
+                        </a>
+                      {% endif %}
+                    {% endfor %}
+                  {% else %}
+                    <span class="text-muted text-xs">Processing Dispatch</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      
+      {% render 'pagination', paginate: paginate %}
+    {% endif %}
+  {% endpaginate %}
+</div>
+
+{% schema %}
+{
+  "name": "Customer Orders",
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "Heading",
+      "default": "My Orders"
+    }
+  ]
+}
+{% endschema %}

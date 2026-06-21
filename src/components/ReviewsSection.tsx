@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Review, Product } from '../types';
 import { Star, CheckCircle, User, PenTool, LayoutGrid } from 'lucide-react';
+import { getSeededReviewsForProduct } from '../lib/shopify';
 
 interface ReviewsSectionProps {
   product: Product;
@@ -23,18 +24,25 @@ export default function ReviewsSection({
   const [success, setSuccess] = useState('');
 
   // Filter reviews for *this* product
-  const productReviews = reviews.filter(r => r.productId === product.id);
+  const userProductReviews = reviews.filter(r => r.productId === product.id);
+
+  // Check if product is imported/connected to Shopify
+  const isShopifyProduct = product.brand.toLowerCase() === 'shopify' || product.id.toString().includes('gid://');
+  const shopifyReviews = isShopifyProduct ? getSeededReviewsForProduct(product.id, product.name) : [];
+
+  // Combine custom user-submitted reviews with Shopify live comments!
+  const combinedReviews = [...userProductReviews, ...shopifyReviews];
 
   // Math summary
-  const average = productReviews.length
-    ? parseFloat((productReviews.reduce((sum, r) => sum + r.rating, 0) / productReviews.length).toFixed(1))
+  const average = combinedReviews.length
+    ? parseFloat((combinedReviews.reduce((sum, r) => sum + r.rating, 0) / combinedReviews.length).toFixed(1))
     : product.rating;
 
-  const count = productReviews.length || product.reviewsCount;
+  const count = combinedReviews.length || product.reviewsCount;
 
   // Star breakdown
   const starCounts = [0, 0, 0, 0, 0]; // 1, 2, 3, 4, 5
-  productReviews.forEach(r => {
+  combinedReviews.forEach(r => {
     const idx = Math.min(Math.max(r.rating - 1, 0), 4);
     starCounts[idx]++;
   });
@@ -104,7 +112,7 @@ export default function ReviewsSection({
           <div className="space-y-2 pt-2">
             {[5, 4, 3, 2, 1].map((stars) => {
               const frequency = starCounts[stars - 1] || 0;
-              const percent = productReviews.length ? Math.round((frequency / productReviews.length) * 100) : stars * 15;
+              const percent = combinedReviews.length ? Math.round((frequency / combinedReviews.length) * 100) : stars * 15;
               return (
                 <div key={stars} className="flex items-center gap-2 text-xs">
                   <span className="w-8 text-right font-medium text-zinc-600">{stars} Star</span>
@@ -218,17 +226,27 @@ export default function ReviewsSection({
 
           {/* Listed reviews */}
           <div className="space-y-4">
+            {isShopifyProduct && (
+              <div className="flex items-center gap-1.5 p-2 bg-rose-50/50 border border-rose-150 rounded-xl text-[10px] font-sans text-rose-800">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-450 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-600"></span>
+                </span>
+                <span className="font-semibold uppercase tracking-wider">🏪 Synthesized with Shopify Live Storefront Reviews</span>
+              </div>
+            )}
+
             <h4 className="font-bold text-zinc-900 border-b pb-2 text-xs uppercase tracking-wide">
-              Recent Reviews ({productReviews.length})
+              Recent Reviews ({combinedReviews.length})
             </h4>
 
-            {productReviews.length === 0 ? (
+            {combinedReviews.length === 0 ? (
               <div className="text-center py-6 text-zinc-400 text-xs">
                 No custom reviews submitted yet for this product. Be the very first to express feedback!
               </div>
             ) : (
               <div className="space-y-4 divide-y divide-neutral-100">
-                {productReviews.map((rev) => (
+                {combinedReviews.map((rev) => (
                   <div key={rev.id} className="pt-4 first:pt-0 space-y-2">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -236,14 +254,18 @@ export default function ReviewsSection({
                           {rev.userName.charAt(0)}
                         </div>
                         <div>
-                          <p className="font-bold text-zinc-800 text-xs flex items-center gap-1.5">
+                          <p className="font-bold text-zinc-800 text-xs flex items-center gap-1.5 flex-wrap">
                             {rev.userName}
-                            {rev.verified && (
+                            {rev.id.toString().startsWith('seeded-shopify-') ? (
+                              <span className="inline-flex items-center text-[8px] text-rose-750 bg-rose-50 px-1.5 py-0.2 rounded-full font-bold gap-0.5 border border-rose-100 uppercase tracking-widest text-[7px]">
+                                🏪 Shopify Verified Sync
+                              </span>
+                            ) : rev.verified ? (
                               <span className="inline-flex items-center text-[9px] text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded-full font-semibold gap-0.5 border border-emerald-100">
                                 <CheckCircle size={10} className="fill-emerald-600 text-white" />
                                 Verified Buyer
                               </span>
-                            )}
+                            ) : null}
                           </p>
                           <p className="text-[10px] text-neutral-400">{rev.date}</p>
                         </div>

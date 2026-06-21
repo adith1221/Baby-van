@@ -1,0 +1,12 @@
+{
+  "name": "Customer Addresses Directory",
+  "sections": {
+    "main": {
+      "type": "customer-addresses",
+      "settings": {}
+    }
+  },
+  "order": [
+    "main"
+  ]
+}

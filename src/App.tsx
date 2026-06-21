@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Product, Address, User, Order, CartItem, Review, BlogPost, ThemeConfig, ShopifyCollection } from './types';
 import {
   INITIAL_PRODUCTS,
@@ -26,7 +26,8 @@ import {
   createShopifyCustomerAccessToken,
   fetchShopifyCustomerProfile,
   updateShopifyCustomerProfile,
-  fetchShopifyCollections
+  fetchShopifyCollections,
+  fetchShopifyThemeData
 } from './lib/shopify';
 import ShopifyCollectionsListView from './components/ShopifyCollectionsListView';
 
@@ -49,6 +50,7 @@ export default function App() {
   ];
 
   const [shopifyCollections, setShopifyCollections] = useState<ShopifyCollection[]>(LOCAL_FALLBACK_COLLECTIONS);
+  const [shopifyThemeData, setShopifyThemeData] = useState<any>(null);
 
   // Shopify products loader hook
   const [shopifyReloadCount, setShopifyReloadCount] = useState(0);
@@ -63,9 +65,10 @@ export default function App() {
         setIsShopifyLoading(true);
         setShopifyError(null);
         try {
-          const [shopifyProds, shopifyCols] = await Promise.all([
+          const [shopifyProds, shopifyCols, shopifyTheme] = await Promise.all([
             fetchShopifyProducts(config),
-            fetchShopifyCollections(config)
+            fetchShopifyCollections(config),
+            fetchShopifyThemeData(config)
           ]);
 
           if (shopifyProds && shopifyProds.length > 0) {
@@ -82,12 +85,19 @@ export default function App() {
           } else {
             setShopifyCollections(LOCAL_FALLBACK_COLLECTIONS);
           }
+
+          if (shopifyTheme) {
+            setShopifyThemeData(shopifyTheme);
+          } else {
+            setShopifyThemeData(null);
+          }
         } catch (err: any) {
           console.error("Shopify loading failed", err);
           setShopifyError(err.message || "Failed to retrieve Shopify storefront data.");
           setShopifyConnected(false);
           setProducts(INITIAL_PRODUCTS);
           setShopifyCollections(LOCAL_FALLBACK_COLLECTIONS);
+          setShopifyThemeData(null);
         } finally {
           setIsShopifyLoading(false);
         }
@@ -96,6 +106,7 @@ export default function App() {
         setShopifyCollections(LOCAL_FALLBACK_COLLECTIONS);
         setShopifyConnected(false);
         setShopifyError(null);
+        setShopifyThemeData(null);
       }
     }
     loadShop();
@@ -105,6 +116,36 @@ export default function App() {
   const [loggedInUser, setLoggedInUser] = useState<User | null>(() => {
     const saved = localStorage.getItem('fc_user');
     return saved ? JSON.parse(saved) : null;
+  });
+
+  const loadedUserEmailRef = useRef<string>(() => {
+    const saved = localStorage.getItem('fc_user');
+    if (saved) {
+      try {
+        const u = JSON.parse(saved);
+        return u && u.email ? u.email.toLowerCase() : 'guest';
+      } catch (e) {}
+    }
+    return 'guest';
+  });
+
+  const [localRegisteredUsers, setLocalRegisteredUsers] = useState<User[]>(() => {
+    const saved = localStorage.getItem('fc_registered_users');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return [];
+      }
+    }
+    return [
+      {
+        id: 'usr-default-mock',
+        email: 'parent@example.com',
+        fullName: 'Jane Doe',
+        phone: '+919876543210'
+      }
+    ];
   });
 
   // Storage Persistence Helpers
@@ -246,75 +287,166 @@ export default function App() {
   }, [reviews]);
 
   useEffect(() => {
-    const key = loggedInUser ? `fc_cart_${loggedInUser.email.toLowerCase()}` : 'fc_cart_guest';
-    localStorage.setItem(key, JSON.stringify(cart));
+    const targetUserEmail = loggedInUser ? loggedInUser.email.toLowerCase() : 'guest';
+    if (loadedUserEmailRef.current === targetUserEmail) {
+      const key = loggedInUser ? `fc_cart_${targetUserEmail}` : 'fc_cart_guest';
+      localStorage.setItem(key, JSON.stringify(cart));
+
+      if (loggedInUser) {
+        fetch('/api/sync-data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: targetUserEmail, cart })
+        }).catch(err => console.error("Cloud cart sync error:", err));
+      }
+    }
   }, [cart, loggedInUser]);
 
   useEffect(() => {
-    const key = loggedInUser ? `fc_wishlist_${loggedInUser.email.toLowerCase()}` : 'fc_wishlist_guest';
-    localStorage.setItem(key, JSON.stringify(wishlist));
+    const targetUserEmail = loggedInUser ? loggedInUser.email.toLowerCase() : 'guest';
+    if (loadedUserEmailRef.current === targetUserEmail) {
+      const key = loggedInUser ? `fc_wishlist_${targetUserEmail}` : 'fc_wishlist_guest';
+      localStorage.setItem(key, JSON.stringify(wishlist));
+
+      if (loggedInUser) {
+        fetch('/api/sync-data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: targetUserEmail, wishlist })
+        }).catch(err => console.error("Cloud wishlist sync error:", err));
+      }
+    }
   }, [wishlist, loggedInUser]);
 
   useEffect(() => {
-    const key = loggedInUser ? `fc_addresses_${loggedInUser.email.toLowerCase()}` : 'fc_addresses_guest';
-    localStorage.setItem(key, JSON.stringify(addresses));
+    const targetUserEmail = loggedInUser ? loggedInUser.email.toLowerCase() : 'guest';
+    if (loadedUserEmailRef.current === targetUserEmail) {
+      const key = loggedInUser ? `fc_addresses_${targetUserEmail}` : 'fc_addresses_guest';
+      localStorage.setItem(key, JSON.stringify(addresses));
+
+      if (loggedInUser) {
+        fetch('/api/sync-data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: targetUserEmail, addresses })
+        }).catch(err => console.error("Cloud addresses sync error:", err));
+      }
+    }
   }, [addresses, loggedInUser]);
 
   useEffect(() => {
-    const key = loggedInUser ? `fc_orders_${loggedInUser.email.toLowerCase()}` : 'fc_orders_guest';
-    localStorage.setItem(key, JSON.stringify(orders));
+    const targetUserEmail = loggedInUser ? loggedInUser.email.toLowerCase() : 'guest';
+    if (loadedUserEmailRef.current === targetUserEmail) {
+      const key = loggedInUser ? `fc_orders_${targetUserEmail}` : 'fc_orders_guest';
+      localStorage.setItem(key, JSON.stringify(orders));
+
+      if (loggedInUser) {
+        fetch('/api/sync-data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: targetUserEmail, orders })
+        }).catch(err => console.error("Cloud orders sync error:", err));
+      }
+    }
   }, [orders, loggedInUser]);
 
   useEffect(() => {
     if (loggedInUser) {
       localStorage.setItem('fc_user', JSON.stringify(loggedInUser));
+      // Also register/update on cloud DB as a synced user session
+      fetch('/api/sync-data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: loggedInUser.email.toLowerCase(), user: loggedInUser })
+      }).catch(err => console.error("User sync error:", err));
     } else {
       localStorage.removeItem('fc_user');
     }
   }, [loggedInUser]);
 
+  useEffect(() => {
+    localStorage.setItem('fc_registered_users', JSON.stringify(localRegisteredUsers));
+  }, [localRegisteredUsers]);
+
+  // Load registered users from server on mount
+  useEffect(() => {
+    fetch('/api/registered-users')
+      .then(r => r.json())
+      .then(res => {
+        if (res.success && Array.isArray(res.users) && res.users.length > 0) {
+          setLocalRegisteredUsers(res.users);
+        }
+      })
+      .catch(err => console.error("Could not fetch cloud-registered users:", err));
+  }, []);
+
   // Sync isolated context instantly when user signs in or out
   useEffect(() => {
-    const email = loggedInUser ? loggedInUser.email.toLowerCase() : null;
+    if (loggedInUser) {
+      const email = loggedInUser.email.toLowerCase();
+      loadedUserEmailRef.current = 'loading';
 
-    // Load user/guest specific Cart
-    const cartKey = email ? `fc_cart_${email}` : 'fc_cart_guest';
-    const savedCart = localStorage.getItem(cartKey);
-    setCart(savedCart ? JSON.parse(savedCart) : []);
-
-    // Load user/guest specific Wishlist
-    const wishKey = email ? `fc_wishlist_${email}` : 'fc_wishlist_guest';
-    const savedWish = localStorage.getItem(wishKey);
-    setWishlist(savedWish ? JSON.parse(savedWish) : []);
-
-    // Load user/guest specific Addresses
-    const addrKey = email ? `fc_addresses_${email}` : 'fc_addresses_guest';
-    const savedAddr = localStorage.getItem(addrKey);
-    if (savedAddr) {
-      setAddresses(JSON.parse(savedAddr));
+      fetch(`/api/sync-data?email=${encodeURIComponent(email)}`)
+        .then(r => r.json())
+        .then(res => {
+          if (res.success) {
+            setCart(res.cart || []);
+            setWishlist(res.wishlist || []);
+            if (res.addresses && res.addresses.length > 0) {
+              setAddresses(res.addresses);
+            } else {
+              setAddresses([
+                {
+                  id: 'addr-default-init',
+                  fullName: loggedInUser?.fullName || 'Adith Saseendran',
+                  phone: loggedInUser?.phone || '9876543210',
+                  addressLine1: 'Flat 402, Sunshine Apartment, Linking Road',
+                  city: 'Mumbai',
+                  state: 'Maharashtra',
+                  zipCode: '400001',
+                  country: 'India',
+                  isDefault: true
+                }
+              ]);
+            }
+            setOrders(res.orders || []);
+          }
+          loadedUserEmailRef.current = email;
+        })
+        .catch(err => {
+          console.error("Could not load synced cloud data:", err);
+          loadedUserEmailRef.current = email;
+        });
     } else {
-      setAddresses([
-        {
-          id: 'addr-default-init',
-          fullName: loggedInUser?.fullName || 'Adith Saseendran',
-          phone: loggedInUser?.phone || '9876543210',
-          addressLine1: 'Flat 402, Sunshine Apartment, Linking Road',
-          city: 'Mumbai',
-          state: 'Maharashtra',
-          zipCode: '400001',
-          country: 'India',
-          isDefault: true
-        }
-      ]);
-    }
+      const savedCart = localStorage.getItem('fc_cart_guest');
+      setCart(savedCart ? JSON.parse(savedCart) : []);
 
-    // Load user/guest specific Past Orders
-    const ordKey = email ? `fc_orders_${email}` : 'fc_orders_guest';
-    const savedOrd = localStorage.getItem(ordKey);
-    if (savedOrd) {
-      setOrders(JSON.parse(savedOrd));
-    } else {
-      setOrders([]);
+      const savedWish = localStorage.getItem('fc_wishlist_guest');
+      setWishlist(savedWish ? JSON.parse(savedWish) : []);
+
+      const savedAddr = localStorage.getItem('fc_addresses_guest');
+      if (savedAddr) {
+        setAddresses(JSON.parse(savedAddr));
+      } else {
+        setAddresses([
+          {
+            id: 'addr-default-init',
+            fullName: 'Adith Saseendran',
+            phone: '9876543210',
+            addressLine1: 'Flat 402, Sunshine Apartment, Linking Road',
+            city: 'Mumbai',
+            state: 'Maharashtra',
+            zipCode: '400001',
+            country: 'India',
+            isDefault: true
+          }
+        ]);
+      }
+
+      const savedOrd = localStorage.getItem('fc_orders_guest');
+      setOrders(savedOrd ? JSON.parse(savedOrd) : []);
+      
+      loadedUserEmailRef.current = 'guest';
     }
   }, [loggedInUser]);
 
@@ -458,20 +590,32 @@ export default function App() {
     } else {
       // Fallback local prototype login
       if (email.includes('@')) {
+        const normalizedEmail = email.trim().toLowerCase();
+        // Look up registered user details first
+        const userFound = localRegisteredUsers.find(u => u.email.trim().toLowerCase() === normalizedEmail);
+        
+        if (userFound) {
+          setLoggedInUser(userFound);
+          return { success: true };
+        }
+
+        // If not found, dynamically initialize a prototype session safely on the fly
         const parts = email.split('@');
-        setLoggedInUser({
+        const newUser: User = {
           id: 'usr-' + Date.now(),
-          email: email,
+          email: email.trim(),
           fullName: parts[0].charAt(0).toUpperCase() + parts[0].slice(1),
-          phone: '9845305121'
-        });
+          phone: '+919876543210'
+        };
+        setLocalRegisteredUsers(prev => [...prev, newUser]);
+        setLoggedInUser(newUser);
         return { success: true };
       }
       return { success: false, message: 'Please specify a valid email address.' };
     }
   };
 
-  const handleRegister = async (email: string, fullName: string, pass: string): Promise<{ success: boolean; message?: string }> => {
+  const handleRegister = async (email: string, fullName: string, pass: string, phone?: string): Promise<{ success: boolean; message?: string }> => {
     const config = getShopifyConfig();
     const isShopifyActive = !(!config.storefrontAccessToken || !config.storeDomain);
 
@@ -480,7 +624,7 @@ export default function App() {
         const names = fullName.trim().split(/\s+/);
         const firstName = names[0] || '';
         const lastName = names.slice(1).join(' ') || 'Parent';
-        const res = await createShopifyCustomer(config, { firstName, lastName, email, password: pass });
+        const res = await createShopifyCustomer(config, { firstName, lastName, email, password: pass, phone });
         if (res.success) {
           return { success: true };
         } else {
@@ -491,11 +635,36 @@ export default function App() {
       }
     } else {
       // Fallback local registration
-      setLoggedInUser({
+      const cleanPhone = phone ? phone.trim().replace(/\s+/g, '') : '';
+      const emailExists = localRegisteredUsers.some(u => u.email.trim().toLowerCase() === email.trim().toLowerCase());
+
+      // If they already exist in localRegisteredUsers, update their details beautifully & log them in!
+      if (emailExists) {
+        const updatedUsers = localRegisteredUsers.map(u => {
+          if (u.email.trim().toLowerCase() === email.trim().toLowerCase()) {
+            return {
+              ...u,
+              fullName,
+              phone: phone || u.phone
+            };
+          }
+          return u;
+        });
+        setLocalRegisteredUsers(updatedUsers);
+        const existingUser = updatedUsers.find(u => u.email.trim().toLowerCase() === email.trim().toLowerCase())!;
+        setLoggedInUser(existingUser);
+        return { success: true };
+      }
+
+      const newUser: User = {
         id: 'usr-' + Date.now(),
         email,
-        fullName
-      });
+        fullName,
+        phone
+      };
+
+      setLocalRegisteredUsers(prev => [...prev, newUser]);
+      setLoggedInUser(newUser);
       return { success: true };
     }
   };
@@ -532,6 +701,9 @@ export default function App() {
     } else {
       // Local fallback
       setLoggedInUser(prev => prev ? { ...prev, ...updated } : null);
+      if (loggedInUser) {
+        setLocalRegisteredUsers(prev => prev.map(u => u.email.trim().toLowerCase() === loggedInUser.email.trim().toLowerCase() ? { ...u, ...updated } : u));
+      }
       return { success: true };
     }
   };
@@ -539,7 +711,7 @@ export default function App() {
   // Address directory modifiers
   const handleAddAddress = (addr: Address) => {
     setAddresses(prev => {
-      let next = [...prev];
+      let next = prev.filter(a => a.id !== addr.id);
       if (addr.isDefault) {
         next = next.map(a => ({ ...a, isDefault: false }));
       }
@@ -658,6 +830,7 @@ export default function App() {
             faqs={INITIAL_FAQS}
             themeConfig={themeConfig}
             heroBanner={heroBanner}
+            shopifyThemeData={shopifyThemeData}
             enabledSections={enabledSections}
             setView={setView}
             setActiveProductId={handleViewProduct}
@@ -910,6 +1083,15 @@ export default function App() {
             orders={orders}
             themeColorId={themeConfig.primaryColor}
             setView={setView}
+            registeredUsers={localRegisteredUsers}
+            products={products}
+            cart={cart}
+            wishlist={wishlist}
+            recentlyViewed={recentlyViewed}
+            onAddToCart={handleAddToCart}
+            onToggleWishlist={handleToggleWishlist}
+            onViewProductDetail={handleViewProduct}
+            onClearRecent={() => setRecentlyViewed([])}
           />
         )}
 
@@ -1547,6 +1729,7 @@ export default function App() {
         isShopifyLoading={isShopifyLoading}
         shopifyError={shopifyError}
         onRefreshShopify={() => setShopifyReloadCount(prev => prev + 1)}
+        shopifyThemeData={shopifyThemeData}
       />
 
     </div>

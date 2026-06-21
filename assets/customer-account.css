@@ -1,0 +1,78 @@
+/* 
+  Shopify Theme Asset: customer-account.css
+  Provides custom styles for the FirstCry-like isolated customer data system.
+*/
+
+.customer-profile-container,
+.customer-orders-container,
+.customer-addresses-container,
+.customer-wishlist-container,
+.customer-baby-profile-container {
+  font-family: 'Inter', system-ui, sans-serif;
+  color: #1c1917;
+}
+
+.avatar-circle-display {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background-color: #f5f5f4;
+  border: 1px solid #e7e5e4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  margin: 0 auto 16px auto;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.profile-card-sidebar {
+  background-color: #fafaf9;
+  border: 1px solid #e7e5e4;
+  border-radius: 20px;
+  padding: 30px 20px;
+}
+
+.profile-title {
+  font-weight: 800;
+  color: #0c0a09;
+}
+
+.profile-detail-card {
+  border-radius: 24px;
+  border-color: #f5f5f4;
+}
+
+.form-control {
+  border-radius: 10px;
+  padding: 10px 14px;
+  border-color: #e7e5e4;
+}
+.form-control:focus {
+  border-color: #1c1917;
+  box-shadow: none;
+}
+
+.badge {
+  font-size: 9px;
+  font-weight: 800;
+  padding: 4px 8px;
+  letter-spacing: 0.5px;
+}
+
+.table th {
+  font-size: 11px;
+  text-transform: uppercase;
+  font-weight: 800;
+  color: #44403c;
+  background-color: #fafaf9;
+}
+
+.card-title {
+  font-size: 14px;
+  letter-spacing: 0.5px;
+}
+
+.border-orange {
+  border: 1px dashed #f97316;
+}

@@ -1,0 +1,53 @@
+{% comment %}
+  Shopify Customer Addresses Section for Baby Van Theme
+  Handles add, edit, delete, and default addresses securely.
+{% endcomment %}
+
+<div class="customer-addresses-container container py-5" data-customer-addresses>
+  <div class="d-flex justify-content-between align-items-center border-bottom pb-3 mb-4">
+    <div>
+      <h2 class="h4 font-bold text-uppercase tracking-wider">📍 Shipping Address Coordinates</h2>
+      <p class="text-muted text-xs">Configure home delivery destinations isolated for {{ customer.name }}.</p>
+    </div>
+    <button type="button" class="btn btn-primary" data-address-toggle>Add New Coordinate</button>
+  </div>
+
+  <div class="address-directory-grid row">
+    {% for address in customer.addresses %}
+      <div class="col-12 col-md-6 mb-4">
+        <div class="card p-4 border {% if address == customer.default_address %}border-dark shadow-sm{% endif %}">
+          <div class="d-flex gap-2 align-items-center mb-1">
+            <h4 class="font-bold my-0 h6">{{ address.first_name }} {{ address.last_name }}</h4>
+            {% if address == customer.default_address %}
+              <span class="badge bg-dark text-uppercase uppercase tracking-wider text-[8px] py-1 px-1.5 rounded-full">Default Option</span>
+            {% endif %}
+          </div>
+          <p class="text-muted mb-2 leading-relaxed">
+            {{ address.company }}<br>
+            {{ address.street }}<br>
+            {{ address.city }}, {{ address.province }} {{ address.zip }}<br>
+            {{ address.country }}
+          </p>
+          <p class="text-xs font-mono text-muted">Phone: {{ address.phone }}</p>
+
+          <div class="d-flex justify-content-between border-top pt-3 mt-2 text-uppercase text-xs font-bold font-sans">
+            <div class="d-flex gap-2">
+              <button class="btn btn-link text-indigo-600 p-0" data-address-edit-trigger="{{ address.id }}">Edit</button>
+              <form class="address-delete-form inline d-inline" method="post" action="/accounts/addresses/{{ address.id }}" onsubmit="return confirm('Confirm coordinate deletion?');">
+                <input type="hidden" name="_method" value="delete">
+                <button type="submit" class="btn btn-link text-danger p-0">Delete</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+{% schema %}
+{
+  "name": "Customer Addresses",
+  "settings": []
+}
+{% endschema %}

@@ -1,0 +1,12 @@
+{
+  "name": "Customer Orders Ledger",
+  "sections": {
+    "main": {
+      "type": "customer-orders",
+      "settings": {}
+    }
+  },
+  "order": [
+    "main"
+  ]
+}

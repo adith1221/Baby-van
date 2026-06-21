@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Product, Brand } from '../types';
 import ProductCard, { getThemeClasses } from './ProductCard';
-import { Filter, SlidersHorizontal, RotateCw, CheckCircle, ChevronDown, RefreshCcw } from 'lucide-react';
+import { Filter, RotateCw, CheckCircle, ChevronDown, RefreshCcw, SlidersHorizontal } from 'lucide-react';
 
 interface CollectionPageViewProps {
   products: Product[];

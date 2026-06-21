@@ -23,6 +23,7 @@ interface AdminCustomizerProps {
   isShopifyLoading: boolean;
   shopifyError: string | null;
   onRefreshShopify: () => void;
+  shopifyThemeData?: any;
 }
 
 
@@ -50,7 +51,8 @@ export default function AdminCustomizer({
   shopifyConnected,
   isShopifyLoading,
   shopifyError,
-  onRefreshShopify
+  onRefreshShopify,
+  shopifyThemeData
 }: AdminCustomizerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
@@ -401,44 +403,134 @@ export default function AdminCustomizer({
                   <span>Main Slider Configuration</span>
                 </div>
                 
-                <div className="space-y-2">
-                  <label className="block font-semibold text-zinc-700">Hero Slider Headline</label>
-                  <input
-                    type="text"
-                    value={heroBanner.title}
-                    onChange={(e) => setHeroBanner(prev => ({ ...prev, title: e.target.value }))}
-                    className="w-full p-2 border border-zinc-200 rounded text-zinc-900 placeholder-zinc-400 outline-hidden font-mono"
-                  />
-                </div>
+                {shopifyConnected ? (
+                  <div className="space-y-3 pt-1">
+                    <div className="flex items-center justify-between bg-white p-2.5 rounded-xl border border-zinc-200">
+                      <span className="font-bold text-neutral-800">Auto-Sync with Shopify</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setThemeConfig(prev => ({
+                            ...prev,
+                            shopifyThemeSyncEnabled: !prev.shopifyThemeSyncEnabled
+                          }));
+                          triggerSuccess(!themeConfig.shopifyThemeSyncEnabled ? 'Shopify Sync Enabled!' : 'Shopify Sync Disabled');
+                        }}
+                        className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden ${
+                          themeConfig.shopifyThemeSyncEnabled ? 'bg-rose-600' : 'bg-neutral-200'
+                        }`}
+                      >
+                        <span
+                          className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-xs ring-0 transition duration-200 ease-in-out ${
+                            themeConfig.shopifyThemeSyncEnabled ? 'translate-x-4' : 'translate-x-0'
+                          }`}
+                        />
+                      </button>
+                    </div>
 
-                <div className="space-y-2">
-                  <label className="block font-semibold text-zinc-700">Hero Slider Subtitle</label>
-                  <textarea
-                    rows={2}
-                    value={heroBanner.subtitle}
-                    onChange={(e) => setHeroBanner(prev => ({ ...prev, subtitle: e.target.value }))}
-                    className="w-full p-2 border border-zinc-200 rounded text-zinc-900 placeholder-zinc-400 outline-hidden font-mono"
-                  />
-                </div>
+                    {themeConfig.shopifyThemeSyncEnabled && (
+                      <div className="bg-white p-3 rounded-xl border border-rose-100 space-y-2.5 animate-fade-in text-[11px]">
+                        <span className="block font-bold text-[10px] text-zinc-600 uppercase tracking-wider">Active Sync Source:</span>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setThemeConfig(prev => ({
+                                ...prev,
+                                shopifyThemeSyncSource: 'brand'
+                              }));
+                              triggerSuccess('Querying Storebrand Slogans...');
+                            }}
+                            className={`p-2 rounded-lg text-xs font-semibold text-center border transition ${
+                              themeConfig.shopifyThemeSyncSource !== 'page'
+                                ? 'bg-rose-50 border-rose-200 text-rose-950 font-bold shadow-xs'
+                                : 'bg-neutral-50 border-neutral-200 text-neutral-500 hover:bg-neutral-100'
+                            }`}
+                          >
+                            🏪 Brand Info
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setThemeConfig(prev => ({
+                                ...prev,
+                                shopifyThemeSyncSource: 'page'
+                              }));
+                              triggerSuccess('Querying Page "homepage"...');
+                            }}
+                            className={`p-2 rounded-lg text-xs font-semibold text-center border transition ${
+                              themeConfig.shopifyThemeSyncSource === 'page'
+                                ? 'bg-rose-50 border-rose-200 text-rose-950 font-bold shadow-xs'
+                                : 'bg-neutral-50 border-neutral-200 text-neutral-500 hover:bg-neutral-100'
+                            }`}
+                          >
+                            📄 "homepage" Page
+                          </button>
+                        </div>
+                        
+                        <div className="text-[10px] text-zinc-500 leading-relaxed pt-1 border-t border-dashed border-rose-100 mt-1">
+                          {themeConfig.shopifyThemeSyncSource !== 'page' ? (
+                            <span>
+                              Loads <strong>{shopifyThemeData?.shopName || 'Live Store Name'}</strong> as Headline, Brand Slogan in the highlight bubble, Brand Description as Subtitle and Brand Cover Image as Background! Edit this live in your <strong>Shopify Admin under Settings &rarr; Brand</strong>.
+                            </span>
+                          ) : (
+                            <span>
+                              Queries page with handle <strong>"homepage"</strong>. Page Title becomes the Main Slider Headline and body summary becomes the Subtitle! Edit this live in your <strong>Shopify Admin under Online Store &rarr; Pages</strong>.
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-2.5 bg-neutral-105/40 border border-neutral-200 rounded-xl text-neutral-500 text-[10px] leading-relaxed animate-fade-in">
+                    ℹ️ Connect to your <strong>Shopify Live Connect</strong> above to synchronize this slider and background live with your Shopify Brand metadata or Pages dynamically!
+                  </div>
+                )}
 
-                <div className="space-y-2">
-                  <label className="block font-semibold text-zinc-700">Hero Slide Image (WebP Supported)</label>
-                  <select
-                    value={heroBanner.bgImage}
-                    onChange={(e) => setHeroBanner(prev => ({ ...prev, bgImage: e.target.value }))}
-                    className="w-full p-2 border border-zinc-200 rounded text-zinc-900 outline-hidden bg-white"
-                  >
-                    <option value="https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?w=1600&auto=format&fit=crop&q=80">
-                      Cozy Baby Swaddles Banner
-                    </option>
-                    <option value="https://images.unsplash.com/photo-1515488042361-404e9250afef?w=1600&auto=format&fit=crop&q=80">
-                      Sensory Playroom Toy Hub Banner
-                    </option>
-                    <option value="https://images.unsplash.com/photo-1519689680058-324335c77eba?w=1600&auto=format&fit=crop&q=80">
-                      Organic Sleepsuits & Clothes Banner
-                    </option>
-                  </select>
-                </div>
+                {/* Manual Inputs only enabled if sync is false/disabled */}
+                {(!themeConfig.shopifyThemeSyncEnabled || !shopifyConnected) && (
+                  <div className="space-y-3 pt-2 animate-fade-in">
+                    <div className="space-y-1">
+                      <label className="block font-semibold text-zinc-700">Hero Slider Headline</label>
+                      <input
+                        type="text"
+                        value={heroBanner.title}
+                        onChange={(e) => setHeroBanner(prev => ({ ...prev, title: e.target.value }))}
+                        className="w-full p-2 border border-zinc-200 rounded text-zinc-900 placeholder-zinc-400 outline-hidden bg-white"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block font-semibold text-zinc-700">Hero Slider Subtitle</label>
+                      <textarea
+                        rows={2}
+                        value={heroBanner.subtitle}
+                        onChange={(e) => setHeroBanner(prev => ({ ...prev, subtitle: e.target.value }))}
+                        className="w-full p-2 border border-zinc-200 rounded text-zinc-900 placeholder-zinc-400 outline-hidden bg-white"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block font-semibold text-zinc-700">Hero Slide Image (WebP Supported)</label>
+                      <select
+                        value={heroBanner.bgImage}
+                        onChange={(e) => setHeroBanner(prev => ({ ...prev, bgImage: e.target.value }))}
+                        className="w-full p-2 border border-zinc-200 rounded text-zinc-900 outline-hidden bg-white"
+                      >
+                        <option value="https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?w=1600&auto=format&fit=crop&q=80">
+                          Cozy Baby Swaddles Banner
+                        </option>
+                        <option value="https://images.unsplash.com/photo-1515488042361-404e9250afef?w=1600&auto=format&fit=crop&q=80">
+                          Sensory Playroom Toy Hub Banner
+                        </option>
+                        <option value="https://images.unsplash.com/photo-1519689680058-324335c77eba?w=1600&auto=format&fit=crop&q=80">
+                          Organic Sleepsuits & Clothes Banner
+                        </option>
+                      </select>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* 4. ONLINE STORE 2.0 SECTIONS TOGGLE */}

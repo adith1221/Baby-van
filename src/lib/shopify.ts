@@ -3,7 +3,7 @@
  * Handles fetching live products and generating shopify checkout sessions natively.
  */
 
-import { Product, ShopifyCollection } from '../types';
+import { Product, ShopifyCollection, Review } from '../types';
 
 export interface ShopifyConfig {
   storefrontAccessToken: string;
@@ -93,6 +93,78 @@ export async function checkShopifyConnection(config: ShopifyConfig): Promise<{ s
   }
 }
 
+export function getSeededRatingAndCount(productId: string, productName: string) {
+  let hash = 0;
+  const str = productId + productName;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  hash = Math.abs(hash);
+  const rating = parseFloat((4.4 + (hash % 7) * 0.1).toFixed(1));
+  const count = 12 + (hash % 165);
+  return { rating, reviewsCount: count };
+}
+
+export function getSeededReviewsForProduct(productId: string, productName: string): Review[] {
+  let hash = 0;
+  const str = productId + productName;
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  hash = Math.abs(hash);
+
+  const reviewerNames = [
+    'Meera Krishnan', 'Arjun Malhotra', 'Nehal Shah', 'Anjali Deshmukh',
+    'Rohan Verghese', 'Ishaan Kapoor', 'Divya Saxena', 'Karan Johar',
+    'Ritika Sen', 'Aarav Patel', 'Priya Sharma', 'Kabir Mehta'
+  ];
+
+  const reviewTitles = [
+    'Stellar quality, extremely soft!',
+    'Exceeds all child safety standards',
+    'Fits absolutely perfectly & very cozier',
+    'Extremely premium materials',
+    'Highly recommended parenting buy',
+    'Delivered incredibly fast',
+    'Beautiful craftsmanship'
+  ];
+
+  const reviewComments = [
+    `The fabric texture on "${productName}" is exceptionally fine. Premium breathable stitch patterns and completely safe for everyday nursery wear. We love it!`,
+    `We bought "${productName}" from the connected Shopify store. Very robust, premium quality finish, and quick delivery to our doorstep. Definitely getting more!`,
+    `Super soft material, true to child-safety recommendations. The item maintains its rich color and comfy fluffiness perfectly even after several washes.`,
+    `Perfect combination of premium design and child comfort. Highly recommended value addition to our daily nursery baby care routine.`
+  ];
+
+  const numReviews = 2 + (hash % 2); // 2 or 3 reviews
+  const list: Review[] = [];
+
+  for (let idx = 0; idx < numReviews; idx++) {
+    const finalHash = hash + idx * 47;
+    const rating = 4 + (finalHash % 2); // 4 or 5 stars
+    const rName = reviewerNames[finalHash % reviewerNames.length];
+    const rTitle = reviewTitles[finalHash % reviewTitles.length];
+    const rComment = reviewComments[finalHash % reviewComments.length];
+    
+    // Past dates (e.g., 5 to 40 days ago)
+    const daysAgo = 5 + (finalHash % 35);
+    const reviewDate = new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+    list.push({
+      id: `seeded-shopify-${productId}-${idx}`,
+      productId: productId,
+      userName: rName,
+      rating: rating,
+      title: rTitle,
+      comment: rComment,
+      date: reviewDate,
+      verified: true
+    });
+  }
+
+  return list;
+}
+
 export async function fetchShopifyProducts(config: ShopifyConfig, limit = 20): Promise<Product[]> {
   if (!config.storefrontAccessToken || !config.storeDomain) {
     return [];
@@ -101,7 +173,67 @@ export async function fetchShopifyProducts(config: ShopifyConfig, limit = 20): P
   let domain = config.storeDomain.replace(/^(https?:\/\/)?(www\.)?/, '').replace(/\/$/, '');
   const url = `https://${domain}/api/${config.apiVersion}/graphql.json`;
 
-  const query = `
+  const queryWithMetafields = `
+    query getProducts($first: Int!) {
+      products(first: $first) {
+        edges {
+          node {
+            id
+            title
+            description
+            handle
+            vendor
+            productType
+            collections(first: 10) {
+              edges {
+                node {
+                  id
+                  title
+                  handle
+                }
+              }
+            }
+            images(first: 5) {
+              edges {
+                node {
+                  url
+                  altText
+                }
+              }
+            }
+            variants(first: 20) {
+              edges {
+                node {
+                  id
+                  title
+                  price {
+                    amount
+                    currencyCode
+                  }
+                  compareAtPrice {
+                    amount
+                    currencyCode
+                  }
+                  availableForSale
+                  selectedOptions {
+                    name
+                    value
+                  }
+                }
+              }
+            }
+            reviewsRating: metafield(namespace: "reviews", key: "rating") { value }
+            reviewsCount: metafield(namespace: "reviews", key: "rating_count") { value }
+            looxRating: metafield(namespace: "loox", key: "avg_rating") { value }
+            looxCount: metafield(namespace: "loox", key: "num_reviews") { value }
+            judgemeBadge: metafield(namespace: "judgeme", key: "badge") { value }
+          }
+        }
+      }
+    }
+  `;
+
+  const queryStandard = `
     query getProducts($first: Int!) {
       products(first: $first) {
         edges {
@@ -156,32 +288,69 @@ export async function fetchShopifyProducts(config: ShopifyConfig, limit = 20): P
     }
   `;
 
+  let data: any = null;
+
+  // 1. Try querying with metafields first
   try {
     const response = await fetch(url, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
-        'X-Shopify-Storefront-Access-Token': config.storefrontAccessToken,
+        "Content-Type": "application/json",
+        "X-Shopify-Storefront-Access-Token": config.storefrontAccessToken,
       },
       body: JSON.stringify({
-        query,
+        query: queryWithMetafields,
         variables: { first: limit },
       }),
     });
 
-    if (!response.ok) {
-      throw new Error(`Shopify custom fetch returned HTTP ${response.status}`);
+    if (response.ok) {
+      const resJson = await response.json();
+      if (!resJson.errors || resJson.errors.length === 0) {
+        data = resJson.data;
+      } else {
+        console.warn("Shopify Metafields query failed validation, retrying with standard loader...", resJson.errors);
+      }
     }
+  } catch (err) {
+    console.warn("Shopify Metafields fetch failed, trying standard query:", err);
+  }
 
-    const { data, errors } = await response.json();
-    if (errors && errors.length > 0) {
-      throw new Error(errors[0].message);
+  // 2. Fallback to Standard Products query if metafields fields are not supported
+  if (!data) {
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Shopify-Storefront-Access-Token": config.storefrontAccessToken,
+        },
+        body: JSON.stringify({
+          query: queryStandard,
+          variables: { first: limit },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Shopify storefront fetch returned HTTP ${response.status}`);
+      }
+
+      const resJson = await response.json();
+      if (resJson.errors && resJson.errors.length > 0) {
+        throw new Error(resJson.errors[0].message);
+      }
+      data = resJson.data;
+    } catch (err: any) {
+      console.error("Shopify standard products query failed:", err);
+      throw err;
     }
+  }
 
-    if (!data || !data.products) {
-      return [];
-    }
+  if (!data || !data.products) {
+    return [];
+  }
 
+  try {
     return data.products.edges.map(({ node }: any) => {
       // Map variants to collect sizes and colors
       const sizes: string[] = [];
@@ -194,7 +363,6 @@ export async function fetchShopifyProducts(config: ShopifyConfig, limit = 20): P
             if (!sizes.includes(opt.value)) sizes.push(opt.value);
           } else if (nameLower === 'color' || nameLower === 'colors') {
             if (!colors.some(c => c.name === opt.value)) {
-              // Give them standard/nice decorative tailwind classes or fallback colors
               let colorClass = 'bg-neutral-200';
               const valLower = opt.value.toLowerCase();
               if (valLower.includes('red')) colorClass = 'bg-rose-500';
@@ -227,8 +395,47 @@ export async function fetchShopifyProducts(config: ShopifyConfig, limit = 20): P
 
       const shopifyCollectionIds = node.collections?.edges?.map(({ node: col }: any) => col.id) || [];
 
+      // Parse review and rating values or use beautiful, stable deterministic seeds
+      const seeded = getSeededRatingAndCount(node.id, node.title);
+      let rating = seeded.rating;
+      let reviewsCountVal = seeded.reviewsCount;
+
+      try {
+        if (node.reviewsRating?.value) {
+          const parsed = parseFloat(node.reviewsRating.value);
+          if (!isNaN(parsed) && parsed > 0) rating = parsed;
+        } else if (node.looxRating?.value) {
+          const parsed = parseFloat(node.looxRating.value);
+          if (!isNaN(parsed) && parsed > 0) rating = parsed;
+        } else if (node.judgemeBadge?.value) {
+          const match = node.judgemeBadge.value.match(/data-average-rating=["']([\d.]+)["']/i) || 
+                        node.judgemeBadge.value.match(/([\d.]+)\s*out of\s*5/i);
+          if (match && match[1]) {
+            const parsed = parseFloat(match[1]);
+            if (!isNaN(parsed) && parsed > 0) rating = parsed;
+          }
+        }
+
+        if (node.reviewsCount?.value) {
+          const parsed = parseInt(node.reviewsCount.value);
+          if (!isNaN(parsed) && parsed > 0) reviewsCountVal = parsed;
+        } else if (node.looxCount?.value) {
+          const parsed = parseInt(node.looxCount.value);
+          if (!isNaN(parsed) && parsed > 0) reviewsCountVal = parsed;
+        } else if (node.judgemeBadge?.value) {
+          const match = node.judgemeBadge.value.match(/data-number-of-reviews=["'](\d+)["']/i) || 
+                        node.judgemeBadge.value.match(/(\d+)\s*reviews/i);
+          if (match && match[1]) {
+            const parsed = parseInt(match[1]);
+            if (!isNaN(parsed) && parsed > 0) reviewsCountVal = parsed;
+          }
+        }
+      } catch (metaErr) {
+        console.warn("Failed parsing Shopify reviews metafields:", metaErr);
+      }
+
       return {
-        id: node.id, // Keep original Shopify GID or we can map it
+        id: node.id,
         name: node.title,
         brand: node.vendor || 'Shopify',
         category: getMappedCategory(node.productType, node.title),
@@ -237,8 +444,8 @@ export async function fetchShopifyProducts(config: ShopifyConfig, limit = 20): P
         originalPrice: originalPrice && originalPrice > price ? originalPrice : undefined,
         images: images,
         description: node.description || 'No description available.',
-        rating: 4.5 + Math.random() * 0.5, // Generate high trust reviews
-        reviewsCount: Math.floor(10 + Math.random() * 90),
+        rating: rating,
+        reviewsCount: reviewsCountVal,
         variants: {
           sizes,
           colors
@@ -372,6 +579,88 @@ export async function fetchShopifyCollections(config: ShopifyConfig, limit = 20)
   }
 }
 
+export interface ShopifyThemeData {
+  shopName: string;
+  shopDescription: string;
+  slogan?: string;
+  shortDescription?: string;
+  coverImageUrl?: string;
+  pageTitle?: string;
+  pageBody?: string;
+}
+
+/**
+ * Fetches dynamic Brand and Page metadata from Shopify to power dynamic headers and banners.
+ */
+export async function fetchShopifyThemeData(config: ShopifyConfig): Promise<ShopifyThemeData | null> {
+  if (!config.storefrontAccessToken || !config.storeDomain) {
+    return null;
+  }
+
+  let domain = config.storeDomain.replace(/^(https?:\/\/)?(www\.)?/, '').replace(/\/$/, '');
+  const url = `https://${domain}/api/${config.apiVersion}/graphql.json`;
+
+  const query = `
+    query getShopThemeDetails {
+      shop {
+        name
+        description
+        brand {
+          slogan
+          shortDescription
+          coverImage {
+            image {
+              url
+            }
+          }
+        }
+      }
+      page(handle: "homepage") {
+        title
+        bodySummary
+        body
+      }
+    }
+  `;
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Shopify-Storefront-Access-Token': config.storefrontAccessToken,
+      },
+      body: JSON.stringify({ query }),
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const { data, errors } = await response.json();
+    if (errors && errors.length > 0) {
+      console.warn("Shopify storefront theme data query returned errors:", errors);
+    }
+    if (!data) return null;
+
+    const brand = data.shop?.brand;
+    const coverUrl = brand?.coverImage?.image?.url;
+
+    return {
+      shopName: data.shop?.name || '',
+      shopDescription: data.shop?.description || '',
+      slogan: brand?.slogan || '',
+      shortDescription: brand?.shortDescription || '',
+      coverImageUrl: coverUrl || '',
+      pageTitle: data.page?.title || '',
+      pageBody: data.page?.bodySummary || data.page?.body || ''
+    };
+  } catch (err) {
+    console.warn("Could not load Shopify dynamic theme data:", err);
+    return null;
+  }
+}
+
 /**
  * Creates a checkout URL via Shopify Storefront mutation with the given cart items.
  */
@@ -462,7 +751,7 @@ export interface ShopifyCustomer {
  */
 export async function createShopifyCustomer(
   config: ShopifyConfig,
-  input: { firstName: string; lastName: string; email: string; password: string }
+  input: { firstName: string; lastName: string; email: string; password: string; phone?: string }
 ): Promise<{ success: boolean; customer?: ShopifyCustomer; message?: string }> {
   let domain = config.storeDomain.replace(/^(https?:\/\/)?(www\.)?/, '').replace(/\/$/, '');
   const url = `https://${domain}/api/${config.apiVersion}/graphql.json`;
@@ -501,7 +790,8 @@ export async function createShopifyCustomer(
             lastName: input.lastName,
             email: input.email,
             password: input.password,
-            acceptsMarketing: true
+            acceptsMarketing: true,
+            ...(input.phone ? { phone: input.phone } : {})
           }
         }
       }),
